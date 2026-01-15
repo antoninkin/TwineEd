@@ -144,8 +144,13 @@ export class StoryRenderer {
         const matches = content.match(/\[\[([^\]]+)\]\]/g) || [];
         return matches.map(m => {
             const inner = m.slice(2, -2);
+            // Handle [[Display->Target]] syntax
+            if (inner.includes('->')) {
+                return inner.split('->')[1].trim();
+            }
+            // Handle [[Display|Target]] syntax
             const parts = inner.split('|');
-            return parts[parts.length - 1];
+            return parts[parts.length - 1].trim();
         });
     }
 
@@ -186,9 +191,14 @@ export class StoryPlayer {
 
         // Convert links
         content = content.replace(/\[\[([^\]]+)\]\]/g, (match, inner) => {
-            const parts = inner.split('|');
-            const display = parts[0];
-            const target = parts[1] || parts[0];
+            let display, target;
+            if (inner.includes('->')) {
+                [display, target] = inner.split('->').map(s => s.trim());
+            } else if (inner.includes('|')) {
+                [display, target] = inner.split('|').map(s => s.trim());
+            } else {
+                display = target = inner.trim();
+            }
             return `<span class="story-link" data-target="${target.replace(/"/g, '&quot;')}">${display}</span>`;
         });
 

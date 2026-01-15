@@ -5,7 +5,16 @@
 import { AuthService, StoryDB } from './firebase.js';
 import { CanvasController } from './canvas.js';
 import { StoryRenderer, StoryPlayer } from './story.js';
-import { parseTwine, exportAsHtml } from './import-export.js';
+import {
+    parseTwine,
+    parseTwee,
+    parseJson,
+    parseFile,
+    exportAsHtml,
+    exportAsTwineArchive,
+    exportAsTwee,
+    exportAsJson
+} from './import-export.js';
 import { $, esc, showToast, generatePassageName, deepClone } from './utils.js';
 
 // =====================================================
@@ -366,9 +375,47 @@ $('deleteStoryBtn').addEventListener('click', async () => {
     }
 });
 
+// =====================================================
+// EXPORT
+// =====================================================
 $('exportStoryBtn').addEventListener('click', () => {
+    $('exportModal').classList.add('active');
+});
+
+$('cancelExport').addEventListener('click', () => {
+    $('exportModal').classList.remove('active');
+});
+
+// Export as Twine Archive (compatible with Twine 2 editor)
+$('exportTwineArchive').addEventListener('click', () => {
+    if (!currentStory) return;
+    exportAsTwineArchive(currentStory);
+    $('exportModal').classList.remove('active');
+    showToast('Exported as Twine Archive!');
+});
+
+// Export as Playable HTML
+$('exportPlayable').addEventListener('click', () => {
+    if (!currentStory) return;
     exportAsHtml(currentStory);
-    showToast('Exported!');
+    $('exportModal').classList.remove('active');
+    showToast('Exported as Playable HTML!');
+});
+
+// Export as Twee 3
+$('exportTwee').addEventListener('click', () => {
+    if (!currentStory) return;
+    exportAsTwee(currentStory);
+    $('exportModal').classList.remove('active');
+    showToast('Exported as Twee!');
+});
+
+// Export as JSON
+$('exportJson').addEventListener('click', () => {
+    if (!currentStory) return;
+    exportAsJson(currentStory);
+    $('exportModal').classList.remove('active');
+    showToast('Exported as JSON!');
 });
 
 // =====================================================
@@ -389,15 +436,32 @@ $('importForm').addEventListener('submit', async e => {
     const reader = new FileReader();
     reader.onload = async event => {
         try {
-            const story = parseTwine(event.target.result);
+            // Use the auto-detect parser
+            const story = parseFile(event.target.result, file.name);
+
             if (!story) {
-                showToast('Could not parse file');
+                showToast('Could not parse file. Check format.');
                 return;
             }
 
-            await StoryDB.create(story);
+            // Create the story in the database
+            await StoryDB.create({
+                title: story.title,
+                startPassage: story.startPassage,
+                passages: story.passages,
+                // Store additional metadata if present
+                ifid: story.ifid,
+                format: story.format,
+                formatVersion: story.formatVersion,
+                zoom: story.zoom,
+                tags: story.tags,
+                stylesheet: story.stylesheet,
+                javascript: story.javascript,
+                tagColors: story.tagColors
+            });
+
             $('importModal').classList.remove('active');
-            showToast('Imported!');
+            showToast('Imported successfully!');
             loadStories();
         } catch (err) {
             console.error(err);
@@ -462,7 +526,7 @@ $('passageModal').addEventListener('click', e => {
 
 async function closePassageEditor() {
     const selectedPassage = renderer.getSelectedPassage();
-    
+
     if (!currentStory || !selectedPassage) {
         $('passageModal').classList.remove('active');
         return;
